@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Location, Post
+from .models import Category, Location, Post, Comment
 
 
 @admin.register(Category)
@@ -25,3 +25,14 @@ class PostAdmin(admin.ModelAdmin):
     list_filter = ('is_published', 'category', 'author')
     search_fields = ('title', 'text')
     date_hierarchy = 'pub_date'
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ('post', 'author', 'created_at', 'text_preview')
+    list_filter = ('created_at', 'author')
+    search_fields = ('text', 'author__username', 'post__title')
+    date_hierarchy = 'created_at'
+    
+    def text_preview(self, obj):
+        return obj.text[:50] + '...' if len(obj.text) > 50 else obj.text
+    text_preview.short_description = 'Текст комментария'

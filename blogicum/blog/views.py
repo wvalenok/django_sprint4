@@ -33,13 +33,19 @@ def index(request):
     return render(request, 'blog/index.html', context)
 
 
-def post_detail(request, id):
-    post = get_object_or_404(
-        Post.objects.select_related('category', 'location', 'author'),
-        id=id
-    )
+def post_detail(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
     
-    # Проверяем, может ли пользователь видеть пост
+    if request.user != post.author:
+        post = get_object_or_404(
+            Post.objects.filter(
+                is_published=True,
+                category__is_published=True,
+                pub_date__lte=timezone.now()
+            ),
+            id=post_id
+        )
+    
     can_view = (
         post.is_published and 
         post.category.is_published and 
@@ -50,16 +56,14 @@ def post_detail(request, id):
         return redirect('blog:index')
     
     comments = post.comments.all()
-    form = CommentForm() if request.user.is_authenticated else None
+    form = CommentForm(request.POST or None) if request.user.is_authenticated else None
     
-    if request.method == 'POST' and request.user.is_authenticated:
-        form = CommentForm(request.POST)
-        if form.is_valid():
-            comment = form.save(commit=False)
-            comment.post = post
-            comment.author = request.user
-            comment.save()
-            return redirect('blog:post_detail', id=post.id)
+    if form and form.is_valid():
+        comment = form.save(commit=False)
+        comment.post = post
+        comment.author = request.user
+        comment.save()
+        return redirect('blog:post_detail', post_id=post.id)
     
     context = {
         'post': post,
@@ -158,7 +162,7 @@ class PostUpdateView(LoginRequiredMixin, UpdateView):
     model = Post
     form_class = PostForm
     template_name = 'blog/create.html'
-    pk_url_kwarg = 'id'
+    pk_url_kwarg = 'post_id'
     
     def get_object(self):
         post = super().get_object()
@@ -167,13 +171,13 @@ class PostUpdateView(LoginRequiredMixin, UpdateView):
         return post
     
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'id': self.object.id})
+        return reverse('blog:post_detail', kwargs={'post_id': self.object.id})
 
 
 class PostDeleteView(LoginRequiredMixin, DeleteView):
     model = Post
     template_name = 'blog/create.html'
-    pk_url_kwarg = 'id'
+    pk_url_kwarg = 'post_id'
     
     def get_object(self):
         post = super().get_object()
@@ -198,7 +202,7 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
         return comment
     
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'id': self.object.post.id})
+        return reverse('blog:post_detail', kwargs={'post_id': self.object.post.id})
 
 
 class CommentDeleteView(LoginRequiredMixin, DeleteView):
@@ -213,4 +217,4 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
         return comment
     
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'id': self.object.post.id})
+        return reverse('blog:post_detail', kwargs={'post_id': self.object.post.id})
