@@ -1,5 +1,7 @@
 from django.core.paginator import Paginator
 from django.db.models import Count
+from django.utils import timezone
+from .models import Post
 
 
 def add_comment_count(queryset):
@@ -13,9 +15,7 @@ def paginate_queryset(request, queryset, per_page=10):
 
 
 def get_published_posts(queryset=None, user=None):
-    from django.utils import timezone
-    from .models import Post
-    
+
     if queryset is None:
         queryset = Post.objects.all()
     

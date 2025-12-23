@@ -23,7 +23,7 @@ def index(request):
         is_published=True,
         category__is_published=True,
         pub_date__lte=timezone.now()
-    ).annotate(comment_count=Count('comments')).order_by('-pub_date')
+    ).annotate(comment_count=Count('comments')).order_by(*Post._meta.ordering)
     
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
@@ -85,7 +85,7 @@ def category_posts(request, category_slug):
         category=category,
         is_published=True,
         pub_date__lte=timezone.now()
-    ).annotate(comment_count=Count('comments')).order_by('-pub_date')
+    ).annotate(comment_count=Count('comments')).order_by(*Post._meta.ordering)
     
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
@@ -96,6 +96,54 @@ def category_posts(request, category_slug):
         'page_obj': page_obj
     }
     return render(request, 'blog/category.html', context)
+
+
+@login_required
+def create_post(request):
+    if request.method == 'POST':
+        form = PostForm(request.POST, request.FILES)
+        if form.is_valid():
+            post = form.save(commit=False)
+            post.author = request.user
+            post.save()
+            return redirect('blog:profile', username=request.user.username)
+    else:
+        form = PostForm()
+    
+    return render(request, 'blog/create.html', {'form': form})
+
+
+@login_required
+def edit_post(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    
+    if post.author != request.user:
+        raise PermissionDenied
+    
+    if request.method == 'POST':
+        form = PostForm(request.POST, request.FILES, instance=post)
+        if form.is_valid():
+            form.save()
+            return redirect('blog:post_detail', post_id=post.id)
+    else:
+        form = PostForm(instance=post)
+    
+    return render(request, 'blog/create.html', {'form': form})
+
+
+@login_required
+def delete_post(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    
+    # Проверка авторства
+    if post.author != request.user:
+        raise PermissionDenied
+    
+    if request.method == 'POST':
+        post.delete()
+        return redirect('blog:profile', username=request.user.username)
+    
+    return render(request, 'blog/create.html', {'object': post})
 
 
 # ---------- Классовые представления ----------
